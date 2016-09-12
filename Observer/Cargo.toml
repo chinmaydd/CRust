@@ -6,3 +6,4 @@ authors = ["chinmaydd <chinmay1dd@gmail.com>"]
 [dependencies]
 docopt = "0.6"
 rustc-serialize = "0.3"  # if you're using `derive(RustcDecodable)`
+git2 = "0.3"
