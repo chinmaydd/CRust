@@ -3,12 +3,15 @@ extern crate docopt;
 extern crate rustc_serialize;
 
 use docopt::Docopt;
+use std::process::exit;
+
+mod lib;
 
 const USAGE: &'static str = "
 Crust::Observer: Used to observe changes in a git repository and report it to a server.
 
 Usage:
-    observer [options] <directory>
+    observer [options] [<directory>]
 
 Options:
     -h --help                       Show this screen
@@ -17,13 +20,7 @@ Options:
     -p --port=<port_number>         Port on the given network address to which the response is to be sent
 ";
 
-// Docopt helps us derive the arguments and parse them into relevant types.
-// Reference:
-// -g            => flag_g
-// --group       => flag_group
-// --group <arg> => flag_group
-// FILE          => arg_FILE
-// <file>        => arg_file
+// Docopt helps us cast the given input into Rust types!
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
@@ -39,6 +36,21 @@ fn main() {
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
+
+    // If there is no directory name given, we exit the program.
+    if args.arg_directory.is_none() {
+        println!("Please input the directory name.");
+        exit(0);
+    }
+        
+    // Since the type of each of the flags and arguments is `Option` we need to unwrap them first.
+    let directory = args.arg_directory.unwrap();
+
+    // Setting the default interval value as 5 if no options are given.
+    let interval = args.flag_interval.unwrap_or_else(|| 5);
+
+    lib::test_function();
+    lib::observe(directory, interval);
 }
 
 #[cfg(test)]
