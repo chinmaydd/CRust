@@ -7,6 +7,8 @@ use docopt::Docopt;
 use std::process::exit;
 use std::thread;
 use std::time::Duration;
+use std::env;
+use git2::Oid;
 
 mod lib;
 
@@ -53,13 +55,28 @@ fn main() {
     // Configure the environment variables.
     lib::configure(directory, interval);
 
+    // Setting a default value for the commit ID.
+    let comm_id_string = "comm_id";
+    env::set_var(comm_id_string, "000");
+
     // Infinite observer loop
     loop {
         thread::sleep(Duration::from_secs(interval as u64));
-        let comm = lib::observe();
-        println!("Current HEAD Commit ID: {}", comm);
+        let latest_commit_id = lib::observe().to_string();
+        
+        let previous_commit_id = match env::var(comm_id_string) {
+            Ok(comm_id) => comm_id,
+            Err(e) => panic!("Could not fetch the commit ID from the env: {}", e),
+        };
+
+        if latest_commit_id.eq(&previous_commit_id) {
+            println!("Same!");
+        } else {
+            env::set_var(comm_id_string, latest_commit_id);
+            println!("Different!");
+            // do something here.
+        }
     }
-    // lib::test_function();
 }
 
 #[cfg(test)]

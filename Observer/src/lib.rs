@@ -35,7 +35,7 @@ pub fn observe() -> Oid {
     };
 
    let commit_val = repo.revparse("HEAD")
-                         .unwrap();
+                        .unwrap();
     
     let object = match Revspec::from(&commit_val) {
         Some(object) => object,
@@ -43,8 +43,6 @@ pub fn observe() -> Oid {
     };
     
     let object_id = Object::id(&object);
-    // println!("{}", object_id);
-    
     return object_id;
 }
 
