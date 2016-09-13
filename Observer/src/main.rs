@@ -1,9 +1,12 @@
 // Including external crates
 extern crate docopt;
 extern crate rustc_serialize;
+extern crate git2;
 
 use docopt::Docopt;
 use std::process::exit;
+use std::thread;
+use std::time::Duration;
 
 mod lib;
 
@@ -21,7 +24,6 @@ Options:
 ";
 
 // Docopt helps us cast the given input into Rust types!
-
 #[derive(Debug, RustcDecodable)]
 struct Args {
     flag_help: bool,
@@ -35,22 +37,29 @@ fn main() {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
-    println!("{:?}", args);
 
     // If there is no directory name given, we exit the program.
     if args.arg_directory.is_none() {
         println!("Please input the directory name.");
         exit(0);
     }
-        
+ 
     // Since the type of each of the flags and arguments is `Option` we need to unwrap them first.
     let directory = args.arg_directory.unwrap();
 
     // Setting the default interval value as 5 if no options are given.
     let interval = args.flag_interval.unwrap_or_else(|| 5);
 
-    lib::test_function();
-    lib::observe(directory, interval);
+    // Configure the environment variables.
+    lib::configure(directory, interval);
+
+    // Infinite observer loop
+    loop {
+        thread::sleep(Duration::from_secs(interval as u64));
+        let comm = lib::observe();
+        println!("Current HEAD Commit ID: {}", comm);
+    }
+    // lib::test_function();
 }
 
 #[cfg(test)]
