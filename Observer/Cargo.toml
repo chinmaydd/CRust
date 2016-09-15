@@ -8,3 +8,4 @@ docopt = "0.6"
 rustc-serialize = "0.3"  # if you're using `derive(RustcDecodable)`
 git2 = "0.3"
 snooze-rs = "0.0.3"
+hyper = "0.9.10"
