@@ -1,6 +1,6 @@
 [package]
-name = "CI"
-version = "0.1.0"
+name = "leeroy"
+version = "0.0.1"
 authors = ["chinmaydd <chinmay1dd@gmail.com>"]
 
 [dependencies]

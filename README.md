@@ -1,4 +1,4 @@
-# CRust
-A simple Continuous Integration(CI) system in Rust
+# Leeroy
+Since Jenkins was not available.
 
-Currently learning Rust through this project. Under heavy development.
+A simple continuous integration server library in Rust. Work in progress.

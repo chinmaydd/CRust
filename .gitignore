@@ -1,2 +1,2 @@
-Observer/target/*
-Observer/Cargo.lock
+Cargo.lock
+target/*
