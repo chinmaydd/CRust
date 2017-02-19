@@ -1,14 +1,6 @@
-// Features intended:
-// Observe (some) specific repos (maybe have each thread monitor one)
-// Check for change in commit ID of HEAD -> Report results to someone
-// If the dispatched module is attached, notify to dispatcher to run said tests
-// Maybe have certain tags in the commit message to check for no tests?
-// completely configurable in terms of functionality
-// Should be implemented as a trait
-// Async requests
-// Maybe have a listener module to send in special requests
-// Have the observer dispatch commits to a later commit?
-// Run dispatchers for all new commits if the time interval involves multiple non-tested commits?
+extern crate git2;
+
+use self::git2::{Repository, Revspec};
 
 /// Path of a certain git repository to be observed.
 /// Could be a WebResource(URI) or a Local(Path) resource.
@@ -33,11 +25,26 @@ impl<T> From<T> for Path where T: AsRef<str> {
 
 /// Generic Observer trait which specifies functions which an Observer should implement
 pub trait GenericObserver {
+    // An error type for reporting commonly occuring errors
     type ObserverErrorType;
+    // Ideally should be a unit of time(?)
+    // type frequency;
+    // Dispatcher to be attached to this observer
+    // type Dispatcher;
+    // NOTE: We are assuming absolutely no interaction between the observer and the 
+    // runner. This is a fair assumption since the observer will only report the results to
+    // the dispatcher and nothing else.
 
     fn new() -> Self;
     fn observe<T: AsRef<str>>(&mut self, resource: T) -> Result<(), Self::ObserverErrorType>;
     fn forget<T: AsRef<str>>(&mut self, resource: T) -> Result<(), Self::ObserverErrorType>;
+    // fn configure_frequency(&mut self, freq: Self::frequency) -> Result<(), Self::ObserverErrorType>;
+
+    // Main function
+    // fn run(&mut self) -> Result<(), Self::ObserverErrorType>;
+
+    // Dispatcher interaction
+    // fn attach_dispatcher(&mut self, dispatcher_instance: Self::Dispatcher) -> Result<(), Self::ObserverErrorType>;    
 }
 
 /// Observer struct.
@@ -49,15 +56,34 @@ pub struct Observer {
 pub enum ObsError {
     AlreadyObserving,
     NotObserving,
+    GitError,
 }
 
-/// Implenting utility functions for implementing GenericObserver trait on our Observer
+/// Implementing utility functions for implementing GenericObserver trait on our Observer
 impl Observer {
     fn already_observing(&self, resource: Path) -> bool {
         if self.resource_paths.contains(&resource) {
             true
         } else {
             false
+        }
+    }
+    
+    fn is_git_repository(&self, resource: Path) -> bool {
+        match resource {
+            Path::WebResource(_) => true,
+            Path::Local(path) => {
+                let repository = match Repository::open(path) {
+                    Ok(x) => x,
+                    Err(_) => return false,
+                };
+                let commit_val = repository.revparse("HEAD").unwrap();
+                let _ = match Revspec::from(&commit_val) {
+                    Some(object) => object,
+                    None => return false,
+                };
+                true
+            }
         }
     }
 }
@@ -76,9 +102,11 @@ impl GenericObserver for Observer {
         let res_path = Path::from(resource);
         if self.already_observing(res_path.clone()) {
             Err(ObsError::AlreadyObserving)
-        } else {
+        } else if self.is_git_repository(res_path.clone()) {
             self.resource_paths.push(res_path);
             Ok(())
+        } else {
+            Err(ObsError::GitError)
         }
     }
 
