@@ -1,6 +1,7 @@
 extern crate git2;
 
-use self::git2::{Repository, Revspec};
+use self::git2::{Repository, Revspec, Remote, Error};
+use self::git2::build::{RepoBuilder};
 
 /// Path of a certain git repository to be observed.
 /// Could be a WebResource(URI) or a Local(Path) resource.
@@ -15,7 +16,8 @@ pub enum Path {
 impl<T> From<T> for Path where T: AsRef<str> {
     fn from(path: T) -> Path {
         let path_str = path.as_ref();
-        if path_str.contains("www") {
+        // FIXME: HACKY AF
+        if path_str.contains("www") || path_str.contains("https") {
             Path::WebResource(path_str.to_owned())
         } else {
             Path::Local(path_str.to_owned())
@@ -53,6 +55,7 @@ pub struct Observer {
 }
 
 /// Error type for reporting Observer errors.
+#[derive(Debug, PartialEq)]
 pub enum ObsError {
     AlreadyObserving,
     NotObserving,
@@ -71,18 +74,16 @@ impl Observer {
     
     fn is_git_repository(&self, resource: Path) -> bool {
         match resource {
-            Path::WebResource(_) => true,
+            Path::WebResource(path) => {
+                let mut r_builder = RepoBuilder::new();
+                let repo = r_builder.clone(&path, "./tmp".as_ref());
+                repo.is_ok()
+            },
             Path::Local(path) => {
-                let repository = match Repository::open(path) {
-                    Ok(x) => x,
-                    Err(_) => return false,
-                };
-                let commit_val = repository.revparse("HEAD").unwrap();
-                let _ = match Revspec::from(&commit_val) {
-                    Some(object) => object,
-                    None => return false,
-                };
-                true
+                match Repository::open(path) {
+                    Ok(_) => true,
+                    Err(_) => false,
+                }
             }
         }
     }
@@ -136,5 +137,44 @@ mod tests {
     fn check_local_path() {
         let a: Path = Path::from("/home/chinmay_dd/defragger.txt".to_owned());
         assert_eq!(a, Path::Local("/home/chinmay_dd/defragger.txt".to_owned()))
+    }
+
+    #[test]
+    fn check_git_error() {
+        let mut a: Observer = Observer::new();
+        let b = a.observe("/home/chinmay_dd/deragger.txt".to_owned());
+        assert_eq!(b, Err(ObsError::GitError))
+    }
+
+    #[test]
+    fn check_ok() {
+        let mut a: Observer = Observer::new();
+        let b = a.observe("/home/chinmay_dd/Projects/Code".to_owned());
+        assert_eq!(b, Ok(()))
+    }
+
+    #[test]
+    fn check_already_observing() {
+        let mut a: Observer = Observer::new();
+        a.observe("/home/chinmay_dd/Projects/Code".to_owned());
+        a.observe("/home/chinmay_dd/Projects/sandpile".to_owned());
+        let d = a.observe("/home/chinmay_dd/Projects/Code".to_owned());
+        assert_eq!(d, Err(ObsError::AlreadyObserving));
+        assert_eq!(a.resource_paths.len(), 2)
+    }
+
+    // #[test]
+    // Working for now, no need to test again and again
+    fn check_correct_web_path() {
+        let mut a: Observer = Observer::new();
+        let b = a.observe("https://github.com/chinmaydd/Code.git".to_owned());
+        assert_eq!(b, Ok(()))
+    } 
+
+    #[test]
+    fn check_incorrect_web_path() {
+        let mut a: Observer = Observer::new();
+        let b = a.observe("www.google.com".to_owned());
+        assert_eq!(b, Err(ObsError::GitError))
     }
 }
