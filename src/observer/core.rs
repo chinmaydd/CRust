@@ -1,7 +1,7 @@
-extern crate git2;
+use git2::{Repository, Revspec, Remote, Error};
+use git2::build::{RepoBuilder};
 
-use self::git2::{Repository, Revspec, Remote, Error};
-use self::git2::build::{RepoBuilder};
+use dispatcher::core::GenericDispatcher;
 
 /// Path of a certain git repository to be observed.
 /// Could be a WebResource(URI) or a Local(Path) resource.
@@ -26,32 +26,31 @@ impl<T> From<T> for Path where T: AsRef<str> {
 }
 
 /// Generic Observer trait which specifies functions which an Observer should implement
-pub trait GenericObserver {
+pub trait GenericObserver<L> where L: GenericDispatcher {
     // An error type for reporting commonly occuring errors
     type ObserverErrorType;
-    // Ideally should be a unit of time(?)
-    // type frequency;
-    // Dispatcher to be attached to this observer
-    // type Dispatcher;
+    // Result type for the Observer
+    type ObserverResultType;
     // NOTE: We are assuming absolutely no interaction between the observer and the 
     // runner. This is a fair assumption since the observer will only report the results to
     // the dispatcher and nothing else.
-
+    
     fn new() -> Self;
     fn observe<T: AsRef<str>>(&mut self, resource: T) -> Result<(), Self::ObserverErrorType>;
     fn forget<T: AsRef<str>>(&mut self, resource: T) -> Result<(), Self::ObserverErrorType>;
-    // fn configure_frequency(&mut self, freq: Self::frequency) -> Result<(), Self::ObserverErrorType>;
+    fn configure_frequency(&mut self, freq: i32) -> Result<(), Self::ObserverErrorType>;
 
     // Main function
-    // fn run(&mut self) -> Result<(), Self::ObserverErrorType>;
+    fn run(&mut self) -> Result<(), Self::ObserverErrorType>;
 
     // Dispatcher interaction
-    // fn attach_dispatcher(&mut self, dispatcher_instance: Self::Dispatcher) -> Result<(), Self::ObserverErrorType>;    
+    fn attach_dispatcher(&mut self, dispatcher_instance: L) -> Result<(), Self::ObserverErrorType>;    
 }
 
 /// Observer struct.
 pub struct Observer {
-    resource_paths: Vec<Path>, 
+    resource_paths: Vec<Path>,
+    frequency: i32,
 }
 
 /// Error type for reporting Observer errors.
@@ -60,6 +59,25 @@ pub enum ObsError {
     AlreadyObserving,
     NotObserving,
     GitError,
+    FrequencyError,
+}
+
+pub enum ObsCommand {
+    Dispatch,
+}
+
+// TODO: Have a listener module for the entire architecture which will allow us to add new
+// repositories dynamically!
+//
+// Should all the three modules listen for JSON formatted messages? Will that make things easier?
+// Maybe have an interactive console as well? That would be sick!
+// Need a design!
+
+/// Result type for Observer
+#[derive(Debug)]
+pub struct ObsResult {
+    // What operation does the Dispatcher have to perform?
+    cmd: ObsCommand,
 }
 
 /// Implementing utility functions for implementing GenericObserver trait on our Observer
@@ -90,12 +108,15 @@ impl Observer {
 }
 
 /// Implementing trait GenericObserver for our default Observer
-impl GenericObserver for Observer {
+impl<L> GenericObserver<L> for Observer where L: GenericDispatcher {
     type ObserverErrorType = ObsError;
+    type ObserverResultType = ObsResult;
 
+    // Assuming default frequency is 5 seconds.
     fn new() -> Self {
         Observer {
             resource_paths: Vec::new(),
+            frequency: 5,
         }
     }
 
@@ -121,11 +142,44 @@ impl GenericObserver for Observer {
             Err(ObsError::NotObserving)
         }
     }
+
+    fn configure_frequency(&mut self, f: i32) -> Result<(), ObsError> {
+        if f > 0 {
+            self.frequency = f;
+            Ok(())
+        } else {
+            Err(ObsError::FrequencyError)
+        }
+    }
+    
+    // Open a set of repos beforehand and then run the loop so that we dont open the repo again and
+    // again. 
+    fn run(&mut self) -> Result<(), ObsError> {
+        info!("Observer module starting up!");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    // These tests should contain only those which test the individual operations of an observer.
     use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn check_git2_dynamic_hash_change() {
+        let a = match Repository::open("/home/chinmay_dd/Projects/wtf") {
+            Ok(repo) => repo,
+            Err(e) => panic!("WTF"),
+        };
+
+        loop {
+            thread::sleep(Duration::from_secs(5));
+            println!("{}", a.revparse_single("HEAD").ok().unwrap().as_commit().unwrap().id());
+        }
+    }
+
 
     #[test]
     fn check_web_resource_for_path() {
